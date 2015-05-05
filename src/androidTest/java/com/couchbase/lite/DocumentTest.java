@@ -617,4 +617,32 @@ public class DocumentTest extends LiteTestCase {
         assertEquals("value3", properties4.get("key"));
         Log.e(TAG, "testMultipleUpdatesInTransactionWithPutProperties() END");
     }
+
+    private class TestAsyncTask extends android.os.AsyncTask<CountDownLatch, Void, Void> {
+        @Override
+        protected Void doInBackground(CountDownLatch... latches) {
+            int count = latches.length;
+            for (int i = 0; i < count; i++) {
+                latches[i].countDown();
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Starting an AsyncTask right after Document.putProperties(), does not call the doInBackround() method?
+     * https://github.com/couchbase/couchbase-lite-java-core/issues/587
+     */
+    public void testPutPropertiesWithAsyncTask() throws CouchbaseLiteException, InterruptedException {
+        Document document = database.createDocument();
+        Map<String, Object> properties = new HashMap<String, Object>();
+        properties.put("foo", "foo");
+        properties.put("bar", Boolean.FALSE);
+        document.putProperties(properties);
+        Assert.assertNotNull(document.getCurrentRevisionId());
+        Assert.assertNotNull(document.getCurrentRevision());
+        CountDownLatch latch = new CountDownLatch(1);
+        new TestAsyncTask().execute(latch);
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+    }
 }
